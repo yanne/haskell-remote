@@ -1,0 +1,3 @@
+XML.Light -> HaXML
+No dep for Data.String.Utils
+use map !!!

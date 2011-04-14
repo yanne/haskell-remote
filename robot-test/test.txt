@@ -1,0 +1,20 @@
+*** Test Cases  ***
+Keyword takes arguments
+    argKeyword
+
+String Return Value
+    ${ret}=  returnsGivenString  input
+    shouldBeEqual  ${ret}  input
+
+Integers as arguments
+    ${ret}=  sum  ${1}  ${2}  ${3}
+
+
+*** Settings ***
+Library  Remote  ${ADDRESS}
+
+
+*** Variables ***
+${ADDRESS}   http://localhost:8001
+
+
