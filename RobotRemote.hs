@@ -7,6 +7,8 @@ import Network
 import System.IO
 import qualified Data.Map as Map
 import Data.String.Utils
+import qualified Data.ByteString as BS
+import Data.ByteString.Internal(c2w, w2c)
 import Text.XML.Light
 import Text.XML.Light.Lexer
 import XMLRPC
@@ -16,17 +18,17 @@ acceptLoop :: Socket -> IO ()
 acceptLoop s = do
     print $ "acceptloop"
     (handle, hostname, _) <- accept s
-    !req <- hGetContents handle
-    hPutStr handle $ createResponse req
+    !req <- BS.hGetContents handle
+    BS.hPut handle $ createResponse req
     hClose handle
     acceptLoop s
 
-createResponse :: String -> String
+createResponse :: BS.ByteString -> BS.ByteString
 createResponse req =
     case action of
-        "get_keyword_names" -> exres2
-        "run_keyword" -> exres2
-    where action = methodName $ payload req
+        "get_keyword_names" -> BS.pack $ map c2w exres2
+        "run_keyword" -> BS.pack $ map c2w exres2
+    where action = methodName $ payload $ map w2c $ BS.unpack req
 {-        then runKeyword kwName kwArgs
         else ""
           kwName = show $ head $ methodParams $ payload req
@@ -99,7 +101,6 @@ methodCall :: String -> Element
 methodCall paylod = head $ tail $ onlyElems $ parseXML paylod
 
 methodName :: String -> String
-methodName paylod = "get_keyword_names"
 methodName payload = case findElement methodName $ methodCall payload of
     (Just e) -> strContent e
     Nothing -> ""
