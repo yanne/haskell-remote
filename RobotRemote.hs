@@ -1,14 +1,12 @@
 {-# LANGUAGE BangPatterns #-}
 module RobotRemote
     (requestTypeAndURI,
-     payload, methodName, methodParams, keywords) where
+     methodName, methodParams, keywords) where
 
 import Network
 import System.IO
 import qualified Data.Map as Map
 import Data.String.Utils
-import qualified Data.ByteString as BS
-import Data.ByteString.Internal(c2w, w2c)
 import Text.XML.Light
 import Text.XML.Light.Lexer
 import XMLRPC
@@ -16,24 +14,20 @@ import Control.Exception
 
 acceptLoop :: Socket -> IO ()
 acceptLoop s = do
-    print $ "acceptloop"
     (handle, hostname, _) <- accept s
-    !req <- BS.hGetContents handle
-    BS.hPut handle $ createResponse req
+    hSetBuffering handle NoBuffering
+    !header <- hGetLine handle
+    !payload <- hGetLine handle
+    print $ payload
+    print $ createResponse payload
+    hPutStr handle $ createResponse payload
     hClose handle
-    acceptLoop s
 
-createResponse :: BS.ByteString -> BS.ByteString
-createResponse req =
-    case action of
-        "get_keyword_names" -> BS.pack $ map c2w exres2
-        "run_keyword" -> BS.pack $ map c2w exres2
-    where action = methodName $ payload $ map w2c $ BS.unpack req
-{-        then runKeyword kwName kwArgs
-        else ""
-          kwName = show $ head $ methodParams $ payload req
-          kwArgs = tail $ methodParams $ payload req
--}
+createResponse :: String -> String
+createResponse req = case action of
+    "get_keyword_names" -> exres2
+    "run_keyword" -> exres2
+    where action = methodName req
 
 responseHeader = join "\n" parts
     where parts = ["HTTP/1.1 200 OK",
@@ -93,18 +87,14 @@ requestTypeAndURI req = (parts !! 0, parts !! 1)
     where parts = splitWs $ firstLine
           firstLine = head $ lines req
 
-payload :: String -> String
-payload req = strip $ unlines $ tail $ splitFromEmptyLine
-    where splitFromEmptyLine = dropWhile (\l -> strip l /="") $ lines req
-
 methodCall :: String -> Element
-methodCall paylod = head $ tail $ onlyElems $ parseXML paylod
+methodCall paylod = head $ tail $ onlyElems $ parseXML paylod
 
 methodName :: String -> String
-methodName payload = case findElement methodName $ methodCall payload of
+methodName payload = case findElement methodName' $ methodCall payload of
     (Just e) -> strContent e
     Nothing -> ""
-    where methodName = unqual "methodName"
+    where methodName' = unqual "methodName"
 
 methodParams :: String -> Params
 methodParams payload = extractValuesFrom $ paramsElem
@@ -116,8 +106,9 @@ extractValuesFrom (Just e) = [value ch | ch <- concat $ [elChildren el | el <- f
           _val elem name content
                 | name ==  "string" = RPCString $ showContent $ head content
                 | name == "array" =  RPCArray $ extractValuesFrom (Just elem)
+                | otherwise = RPCString "blaa"
 
 main :: IO ()
 main = do
   s <- listenOn (PortNumber 8001)
-  acceptLoop s
+  sequence_ $ repeat $ acceptLoop s
